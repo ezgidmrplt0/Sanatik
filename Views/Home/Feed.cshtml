@@ -1,0 +1,551 @@
+﻿@model Sanatik.Models.HomeViewModel
+
+@{
+    Layout = null; 
+    var rand = new Random();
+
+
+
+    // Collision Detection Helpers
+    var occupied = new List<(int Top, int Left, int Width, int Height)>();
+    
+    bool IsColliding(int t, int l, int w, int h)
+    {
+        foreach(var rect in occupied)
+        {
+            if (l < rect.Left + rect.Width &&
+                l + w > rect.Left &&
+                t < rect.Top + rect.Height &&
+                t + h > rect.Top)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    (int Top, int Left) GetRandomPosition(int w, int h)
+    {
+        int maxAttempts = 50;
+        for(int i = 0; i < maxAttempts; i++)
+        {
+            int t = rand.Next(5, 80); 
+            int l = rand.Next(5, 85); 
+            
+            if (!IsColliding(t, l, w, h))
+            {
+                return (t, l);
+            }
+        }
+        return (rand.Next(5, 80), rand.Next(5, 85));
+    }
+}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Global Feed - Sanatik</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Space+Grotesk:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" />
+    <link rel="stylesheet" href="~/css/map-style.css" />
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.0/font/bootstrap-icons.css">
+    
+    <style>
+        .is-featured img {
+             border: 2px solid var(--accent-blue);
+             box-shadow: 0 0 15px var(--accent-blue);
+        }
+        .is-featured::after {
+            content: 'FEATURED';
+            position: absolute;
+            top: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--accent-blue);
+            color: #000;
+            font-size: 0.6rem;
+            padding: 2px 8px;
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: bold;
+            z-index: 101;
+        }
+        
+        /* Modal Glass Effect */
+        .modal-glass-container {
+            background: rgba(15, 15, 15, 0.7) !important;
+            backdrop-filter: blur(25px) saturate(180%);
+            -webkit-backdrop-filter: blur(25px) saturate(180%);
+            border: 1px solid rgba(255, 255, 255, 0.08); /* Faint border */
+            box-shadow: 0 30px 60px rgba(0,0,0,0.5);
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Animated gradient bg */
+        .modal-glass-container::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle at 30% 30%, rgba(0, 243, 255, 0.08), transparent 40%),
+                        radial-gradient(circle at 70% 70%, rgba(255, 0, 150, 0.08), transparent 40%);
+            animation: rotateBg 15s linear infinite;
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        @@keyframes rotateBg {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .glass-transparent { background: transparent !important; }
+        .glass-semi { background: rgba(0,0,0,0.2) !important; }
+        .glass-border-bottom { border-bottom: 1px solid rgba(255,255,255,0.1) !important; }
+        .glass-border-top { border-top: 1px solid rgba(255,255,255,0.1) !important; }
+        .glass-border-left { border-left: 1px solid rgba(255,255,255,0.1) !important; }
+        
+        /* Input Field Glass override */
+        .form-control-glass {
+            background: rgba(255, 255, 255, 0.05) !important;
+            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+            color: white !important;
+        }
+        .form-control-glass:focus {
+            background: rgba(255, 255, 255, 0.1) !important;
+            box-shadow: 0 0 10px rgba(255,255,255,0.1);
+        }
+    </style>
+</head>
+<body class="map-mode text-white">
+    <!-- 3D Background Canvas -->
+    <canvas id="star-canvas" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -1; background: #050505;"></canvas>
+
+    <!-- Top Navigation Overlay -->
+    <div class="position-fixed top-0 start-0 w-100 p-4 d-flex justify-content-between align-items-center" style="z-index: 200; pointer-events: none;">
+        <div>
+            <h1 class="font-display m-0" style="pointer-events: auto;">GLOBAL FEED</h1>
+            <p class="text-secondary font-mono small" style="pointer-events: auto;">CURATED & DISCOVERY • DRAG TO EXPLORE</p>
+        </div>
+        <div style="pointer-events: auto;">
+             @if(User.Identity.IsAuthenticated)
+             {
+                 <a href="/Photos/MyGallery" class="btn btn-outline-light rounded-pill px-4 me-2">MY PROFILE</a>
+             }
+             else 
+             {
+                 <a href="/Identity/Account/Login" class="btn btn-outline-light rounded-pill px-4 me-2">LOGIN</a>
+             }
+             <a href="/Photos/Create" class="btn btn-primary rounded-pill px-4">UPLOAD</a>
+        </div>
+    </div>
+
+    <!-- Viewport for the Map -->
+    <div id="viewport">
+        <div id="world">
+            @if (!Model.Featured.Any() && !Model.Discovery.Any())
+            {
+                <div class="d-flex justify-content-center align-items-center" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;">
+                    <div class="text-center p-5 mx-3" style="background: rgba(15, 15, 15, 0.7); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 20px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); max-width: 500px;">
+                        <i class="bi bi-globe2 mb-3 d-block text-secondary" style="font-size: 3rem;"></i>
+                        <h2 class="font-display text-white mb-2">FEED EMPTY</h2>
+                        <p class="text-secondary font-mono small mb-4">No photos have been shared globally yet.</p>
+                        <a href="/Photos/Create" class="btn btn-primary rounded-pill px-5 shadow-lg">BE THE FIRST</a>
+                    </div>
+                </div>
+            }
+            else
+            {
+
+
+                @foreach(var photo in Model.Featured)
+                {
+                    var name = photo.User?.UserName?.Split(new[] { '@' })[0].ToUpper() ?? "UNKNOWN";
+                    
+                    // Featured cards are slightly larger 
+                    int width = 12; 
+                    int height = 25; 
+                    var pos = GetRandomPosition(width, height);
+                    occupied.Add((pos.Top, pos.Left, width, height));
+
+                    <div class="map-card p-2 is-featured" onclick="openModal(@photo.Id)" 
+                         style="position: absolute; top: @(pos.Top)%; left: @(pos.Left)%; width: 280px; z-index: 10;">
+                        <img src="@photo.ImagePath" alt="@photo.Title" draggable="false">
+                        <div class="p-2">
+                             <h6 class="font-display mb-0 text-truncate">@photo.Title</h6>
+                             <small class="text-warning font-mono d-block mt-1" style="font-size: 0.75rem; letter-spacing: 0.05em;">
+                                 // FEATURED ARTIST: @name
+                             </small>
+                             <div class="mt-2 text-end">
+                                 <button class="btn btn-sm btn-outline-light rounded-0 py-0" style="font-size: 0.7rem;">INSPECT</button>
+                             </div>
+                        </div>
+                    </div>
+                }
+
+                @foreach(var photo in Model.Discovery)
+                {
+                    if(Model.Featured.Any(f => f.Id == photo.Id)) continue;
+                    var name = photo.User?.UserName?.Split(new[] { '@' })[0] ?? "unknown";
+                    
+                    // Discovery cards are smaller
+                    int width = 9; 
+                    int height = 20;
+                    var pos = GetRandomPosition(width, height);
+                    occupied.Add((pos.Top, pos.Left, width, height));
+
+                    <div class="map-card p-2" onclick="openModal(@photo.Id)" 
+                         style="position: absolute; top: @(pos.Top)%; left: @(pos.Left)%; width: 250px; z-index: 5;">
+                        <img src="@photo.ImagePath" alt="@photo.Title" draggable="false">
+                        <div class="p-2">
+                             <h6 class="font-display mb-0 text-truncate">@photo.Title</h6>
+                             <small class="text-secondary font-mono d-block mt-1">
+                                 @@@name
+                             </small>
+                             <div class="mt-2 text-end">
+                                 <button class="btn btn-sm btn-outline-secondary rounded-0 py-0" style="font-size: 0.7rem;">VIEW</button>
+                             </div>
+                        </div>
+                    </div>
+                }
+            }
+        </div>
+    </div>
+
+    <!-- Photo Detail Modal (Overlay) -->
+    <div id="detailModal" class="position-fixed top-0 start-0 w-100 h-100 justify-content-center align-items-center" 
+         style="background: rgba(0,0,0,0.85); z-index: 9999; display: none; backdrop-filter: blur(5px);">
+         
+         <div class="modal-glass-container d-flex" style="width: 1000px; height: 650px; max-width: 95vw; max-height: 90vh; border-radius: 12px; overflow: hidden;">
+             
+             <!-- Image Section (Left - 65%) -->
+             <div class="h-100 bg-black d-flex align-items-center justify-content-center position-relative" style="width: 65%;">
+                 <button class="position-absolute start-0 top-50 translate-middle-y btn btn-link text-white p-2 ms-3 opacity-75 hover-opacity-100 rounded-circle" onclick="prevPhoto()" style="z-index: 10000; font-size: 2rem; background: rgba(0,0,0,0.5); width: 60px; height: 60px; display: flex; align-items: center; justify-content: center;"><i class="bi bi-chevron-left"></i></button>
+                 <button class="position-absolute end-0 top-50 translate-middle-y btn btn-link text-white p-2 me-3 opacity-75 hover-opacity-100 rounded-circle" onclick="nextPhoto()" style="z-index: 10000; font-size: 2rem; background: rgba(0,0,0,0.5); width: 60px; height: 60px; display: flex; align-items: center; justify-content: center;"><i class="bi bi-chevron-right"></i></button>
+                 <img id="dm_img" src="" style="width: 100%; height: 100%; object-fit: contain; position: relative; z-index: 1;">
+             </div>
+
+             <!-- Details Section (Right - 35%) -->
+             <div class="h-100 d-flex flex-column text-white glass-border-left" style="width: 35%; background: rgba(10,10,10,0.6);">
+                 
+                 <!-- Header -->
+                 <div class="p-3 glass-border-bottom">
+                     <div class="d-flex justify-content-between align-items-start">
+                         <div>
+                             <h5 id="dm_title" class="font-display mb-1 text-wrap text-white" style="line-height: 1.2;">Title</h5>
+                             <small class="text-secondary font-mono d-block mb-2">
+                                 by <span id="dm_user" class="text-white" style="position: relative; z-index: 10000; pointer-events: auto;">User</span>
+                                 <button id="btnFollow" onclick="actionFollow()" class="btn btn-sm btn-outline-primary rounded-pill py-0 px-2 ms-2" style="font-size: 0.65rem; display: none; position: relative; z-index: 10000; pointer-events: auto;">FOLLOW</button>
+                             </small>
+                         </div>
+                         <button onclick="closeModal()" class="btn btn-link text-white p-0 opacity-75 hover-opacity-100" style="z-index: 10000; pointer-events: auto;"><i class="bi bi-x-lg" style="font-size: 1.5rem;"></i></button>
+                     </div>
+                     <p id="dm_desc" class="text-white-50 small mb-0 text-wrap" style="max-height: 60px; overflow-y: auto;">Description...</p>
+                 </div>
+
+                 <!-- Stats Bar -->
+                 <div class="p-3 glass-border-bottom d-flex justify-content-around align-items-center bg-transparent">
+                     <div class="text-center cursor-pointer p-2" onclick="actionLike()" style="transition: transform 0.1s; pointer-events: auto;">
+                         <i id="btnLikeIcon" class="bi bi-heart text-white" style="font-size: 1.8rem; display: block; margin-bottom: 5px;"></i>
+                         <div class="small text-white-50" style="font-size: 0.7rem;"><span id="dm_likeCount">0</span> Likes</div>
+                     </div>
+                     <div class="text-center cursor-pointer p-2" onclick="actionFavorite()" style="transition: transform 0.1s; pointer-events: auto;">
+                         <i id="btnFavIcon" class="bi bi-bookmark text-white" style="font-size: 1.8rem; display: block; margin-bottom: 5px;"></i>
+                         <div class="small text-white-50" style="font-size: 0.7rem;"><span id="dm_favCount">0</span> Saves</div>
+                     </div>
+                 </div>
+
+                 <!-- Comments Area -->
+                 <div class="flex-grow-1 overflow-auto p-3" id="commentsList" style="background: rgba(0,0,0,0.2);">
+                     <!-- Comments injected JS -->
+                 </div>
+
+                 <!-- Input Area -->
+                 <div class="p-3 glass-border-top bg-transparent">
+                     <div class="input-group">
+                         <input type="text" id="commentInput" class="form-control form-control-sm bg-transparent text-white border-secondary" placeholder="Add a comment..." style="border-right: none;">
+                         <button class="btn btn-sm btn-outline-secondary border-secondary text-white" onclick="postComment()" style="border-left: none;">POST</button>
+                     </div>
+                 </div>
+
+             </div>
+         </div>
+    </div>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/map-interaction.js"></script>
+    <script src="~/js/bg-stars.js"></script>
+    
+    <script>
+        // RAZOR SAFE VARIABLES
+        var AT_SYMBOL = '@("@")'; 
+        let currentPhotoId = 0;
+        let currentPhotoUserId = ""; // To store the photo owner's ID
+        
+        // Combine lists for navigation
+        var photoIds = [@string.Join(",", Model.Featured.Select(p => p.Id).Concat(Model.Discovery.Where(d => !Model.Featured.Any(f => f.Id == d.Id)).Select(p => p.Id)))];
+        let currentIndex = -1;
+
+        document.addEventListener("DOMContentLoaded", function() {
+            console.log("Feed script loaded.");
+        });
+
+        function openModal(id) {
+            console.log("openModal called with id:", id);
+            currentPhotoId = id;
+            currentIndex = photoIds.indexOf(id);
+
+            var modal = document.getElementById('detailModal');
+            if(!modal) {
+                alert("Error: Modal element not found!");
+                return;
+            }
+            
+            modal.style.display = 'flex';
+            
+            // UI References
+            var imgEl = document.getElementById('dm_img');
+            var titleEl = document.getElementById('dm_title');
+            var userEl = document.getElementById('dm_user');
+            var followBtn = document.getElementById('btnFollow');
+            var descEl = document.getElementById('dm_desc');
+            var likeCountEl = document.getElementById('dm_likeCount');
+            var favCountEl = document.getElementById('dm_favCount');
+            
+            // Set loading state
+            if(imgEl) { imgEl.style.opacity = '0.5'; imgEl.src = ''; }
+            if(titleEl) titleEl.innerText = 'Loading...';
+            if(followBtn) followBtn.style.display = 'none';
+            
+            // Fetch Data
+            fetch('/Photos/GetPhotoDetails?id=' + id)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error("HTTP error " + response.status);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log("Data received:", data);
+                    
+                    // Standardize data (handle casing)
+                    var title = data.title || data.Title || "Untitled";
+                    var imagePath = data.imagePath || data.ImagePath || "";
+                    var userName = data.userName || data.UserName || "Unknown";
+                    var description = data.description || data.Description || "No description.";
+                    var likeCount = data.likeCount ?? data.LikeCount ?? 0;
+                    var favCount = data.favoriteCount ?? data.FavoriteCount ?? 0;
+                    var isLiked = data.isLiked ?? data.IsLiked ?? false;
+                    var isFavorited = data.isFavorited ?? data.IsFavorited ?? false;
+                    var comments = data.comments || data.Comments || [];
+                    var isFollowing = data.isFollowing ?? data.IsFollowing ?? false;
+                    currentPhotoUserId = data.photoUserId || data.PhotoUserId || "";
+
+                    // Populate UI
+                    if(imgEl) { 
+                        imgEl.src = imagePath; 
+                        imgEl.onload = function() { this.style.opacity = '1'; };
+                    }
+                    if(titleEl) titleEl.innerText = title;
+                    
+                    // Format username
+                    if(userEl) {
+                        try {
+                            let safeName = userName;
+                            if(safeName.includes(AT_SYMBOL)) {
+                                safeName = safeName.split(AT_SYMBOL)[0];
+                            }
+                            // Make username clickable
+                            if(currentPhotoUserId) {
+                                userEl.innerHTML = `<a href="/Profile/Index/${currentPhotoUserId}" class="text-white text-decoration-none" style="transition: color 0.2s;" onmouseover="this.className='text-info text-decoration-none'" onmouseout="this.className='text-white text-decoration-none'">${AT_SYMBOL}${safeName.toUpperCase()}</a>`;
+                            } else {
+                                userEl.innerText = AT_SYMBOL + safeName.toUpperCase();
+                            }
+                        } catch(e) {
+                            console.error("Format error", e);
+                            userEl.innerText = userName;
+                        }
+                    }
+                    
+                    // Follow Button Logic
+                    if(followBtn && currentPhotoUserId) {
+                        followBtn.style.display = 'inline-block';
+                        updateFollowButton(isFollowing);
+                    } else {
+                        followBtn.style.display = 'none';
+                    }
+                    
+                    if(descEl) descEl.innerText = description;
+                    if(likeCountEl) likeCountEl.innerText = likeCount;
+                    if(favCountEl) favCountEl.innerText = favCount;
+                    
+                    // Icons
+                    updateIcon('btnLikeIcon', isLiked, 'bi-heart-fill text-danger', 'bi-heart text-white');
+                    updateIcon('btnFavIcon', isFavorited, 'bi-bookmark-fill text-primary', 'bi-bookmark text-white');
+
+                    // Comments
+                    const list = document.getElementById('commentsList');
+                    if(list) {
+                        list.innerHTML = '';
+                        if(comments.length > 0) {
+                            comments.forEach(c => {
+                                var cUser = c.userName || c.UserName || "user";
+                                var cUserId = c.userId || c.UserId || ""; // Get User Id
+                                var cContent = c.content || c.Content || "";
+                                var cTime = c.timeAgo || c.TimeAgo || "";
+                                
+                                let cSafeName = cUser;
+                                if(cSafeName.includes(AT_SYMBOL)) cSafeName = cSafeName.split(AT_SYMBOL)[0];
+
+                                const div = document.createElement('div');
+                                div.className = 'mb-3 d-flex flex-column align-items-start';
+                                div.innerHTML = `
+                                    <div class="glass-message p-2 px-3 rounded-3" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1);">
+                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                            <a href="/Profile/Index/${cUserId}" class="fw-bold fs-6 text-info me-2 text-decoration-none hover-text-white">${AT_SYMBOL}${cSafeName.toUpperCase()}</a>
+                                            <span class="text-white-50 small font-mono" style="font-size: 0.65rem;">${cTime}</span>
+                                        </div>
+                                        <p class="mb-0 small" style="line-height: 1.4; color: #ffffff !important; font-weight: 500;">${cContent}</p>
+                                    </div>
+                                `;
+                                list.appendChild(div);
+                            });
+                        } else {
+                            list.innerHTML = '<div class="text-center text-muted small mt-5">No comments yet.</div>';
+                        }
+                    }
+
+                })
+                .catch(err => {
+                    console.error("Fetch error:", err);
+                    alert("Error loading photo details: " + err.message);
+                    if(titleEl) titleEl.innerText = "Error";
+                });
+        }
+
+        function closeModal() {
+            document.getElementById('detailModal').style.display = 'none';
+        }
+
+        function updateIcon(elId, isActive, activeClass, inactiveClass) {
+            const el = document.getElementById(elId);
+            if(el) {
+                // Remove both potential state classes first
+                const activeParts = activeClass.split(' ');
+                const inactiveParts = inactiveClass.split(' ');
+                
+                // We keep base classes, just swap state-specific ones
+                // Ideally, we just set the exact class string we want, BUT we want to preserve 'text-white' if it's the inactive state
+                // and 'text-danger' if active. 
+                
+                // Let's just force the standard sizes + the requested color
+                if(isActive) {
+                    el.className = 'bi ' + activeClass; // e.g. bi-heart-fill text-danger
+                } else {
+                    el.className = 'bi ' + inactiveClass; // e.g. bi-heart text-white
+                }
+                
+                // Enforce size via style if needed, but we did that in HTML. 
+                // The fs-4 class was removing my custom size potentially? 
+                // I removed fs-4 from here.
+            }
+        }
+
+        function updateFollowButton(isFollowing) {
+            const btn = document.getElementById('btnFollow');
+            if(isFollowing) {
+                btn.innerText = "UNFOLLOW";
+                btn.className = "btn btn-sm btn-light rounded-pill py-0 px-2 ms-2";
+            } else {
+                btn.innerText = "FOLLOW";
+                btn.className = "btn btn-sm btn-outline-primary rounded-pill py-0 px-2 ms-2";
+            }
+        }
+
+        function actionFollow() {
+             if(typeof $ !== 'undefined' && currentPhotoUserId) {
+                 $.post('/Photos/ToggleFollow', { followeeId: currentPhotoUserId }, function(res) {
+                     if(res.success) {
+                         updateFollowButton(res.isFollowing);
+                     } else {
+                         alert("Could not update follow status.");
+                     }
+                 }).fail(function(xhr) {
+                     alert("Error: " + xhr.responseText);
+                 });
+             }
+        }
+
+        function actionLike() {
+             if(typeof $ !== 'undefined') {
+                 $.post('/Photos/AjaxLike', { photoId: currentPhotoId }, function(res) {
+                     if(res.success) {
+                         updateIcon('btnLikeIcon', res.isLiked, 'bi-heart-fill text-danger', 'bi-heart text-white');
+                         document.getElementById('dm_likeCount').innerText = res.count;
+                     }
+                 });
+             }
+        }
+
+        function actionFavorite() {
+             if(typeof $ !== 'undefined') {
+                 $.post('/Photos/ToggleFavorite', { photoId: currentPhotoId }, function(res) {
+                     if(res.success) {
+                          updateIcon('btnFavIcon', res.isFavorited, 'bi-bookmark-fill text-primary', 'bi-bookmark text-white');
+                          document.getElementById('dm_favCount').innerText = res.count;
+                     }
+                 });
+             }
+        }
+
+        function postComment() {
+            const input = document.getElementById('commentInput');
+            const val = input.value;
+            if(!val) return;
+
+            if(typeof $ !== 'undefined') {
+                $.post('/Photos/AjaxComment', { photoId: currentPhotoId, content: val }, function(res) {
+                    if(res.success) {
+                         input.value = '';
+                         const list = document.getElementById('commentsList');
+                         if(list.innerText.includes('No comments yet')) list.innerHTML = '';
+
+                         const div = document.createElement('div');
+                         div.className = 'mb-3 d-flex flex-column align-items-start';
+                         div.innerHTML = `
+                                <div class="glass-message p-2 px-3 rounded-3" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1);">
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <a href="/Profile/Index/${res.userId}" class="fw-bold fs-6 text-info me-2 text-decoration-none hover-text-white">${AT_SYMBOL}${res.userName.toUpperCase()}</a>
+                                        <span class="text-white-50 small font-mono" style="font-size: 0.65rem;">${res.timeAgo}</span>
+                                    </div>
+                                    <p class="mb-0 small" style="line-height: 1.4; color: #ffffff !important; font-weight: 500;">${res.content}</p>
+                                </div>
+                            `;
+                         list.insertBefore(div, list.firstChild);
+                    }
+                });
+            }
+        }
+        function prevPhoto() {
+            if(currentIndex > 0) {
+                currentIndex--;
+                openModal(photoIds[currentIndex]);
+            }
+        }
+
+        function nextPhoto() {
+            if(currentIndex < photoIds.length - 1) {
+                currentIndex++;
+                openModal(photoIds[currentIndex]);
+            }
+        }
+    </script>
+</body>
+</html>

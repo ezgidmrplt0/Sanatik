@@ -1,0 +1,68 @@
+@{
+    Layout = null; // Standalone page
+}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sanatik - Select Access</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Space+Grotesk:wght@400;700&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="~/css/intro.css" />
+</head>
+<body>
+
+    <!-- Animated 3D Starfield Background -->
+    <canvas id="star-canvas" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -1; background: #050505;"></canvas>
+
+    <div class="intro-container">
+        <div class="menu-stack">
+            @if(User.Identity.IsAuthenticated)
+            {
+                 <a href="/Home/Feed" onclick="transitionTo(event, '/Home/Feed')" class="menu-card active-user">
+                    <span class="card-label">@User.Identity.Name.ToUpper()</span>
+                    <span class="card-title">ENTER GALLERY <span class="status-dot green"></span></span>
+                </a>
+                <form class="form-inline" asp-area="Identity" asp-page="/Account/Logout" asp-route-returnUrl="/Home/Index" method="post" style="z-index: 10;">
+                    <button type="submit" class="btn-logout">LOGOUT</button>
+                </form>
+            }
+            else
+            {
+                <!-- Option 1: Login -->
+                <a href="/Identity/Account/Login?returnUrl=/Home/Feed" onclick="transitionTo(event, this.href)" class="menu-card">
+                    <span class="card-label">MEMBER ACCESS</span>
+                    <span class="card-title">LOGIN <span class="status-dot"></span></span>
+                </a>
+
+                <!-- Option 2: Register -->
+                <a href="/Identity/Account/Register?returnUrl=/Home/Feed" onclick="transitionTo(event, this.href)" class="menu-card">
+                    <span class="card-label">NEW ACCOUNT</span>
+                    <span class="card-title">JOIN US <span class="status-dot blue"></span></span>
+                </a>
+
+                <!-- Option 3: Guest -->
+                <a href="#" onclick="transitionTo(event, '/Home/Feed')" class="menu-card">
+                    <span class="card-label">EXPLORE ONLY</span>
+                    <span class="card-title">GUEST</span>
+                </a>
+            }
+        </div>
+    </div>
+
+    <div class="glitch-layer" id="glitchOverlay"></div>
+
+    <script>
+        function transitionTo(e, url) {
+            e.preventDefault();
+            const overlay = document.getElementById('glitchOverlay');
+            overlay.classList.add('active');
+            setTimeout(() => {
+                window.location.href = url;
+            }, 800);
+        }
+    </script>
+    <script src="~/js/bg-stars.js"></script>
+</body>
+</html>

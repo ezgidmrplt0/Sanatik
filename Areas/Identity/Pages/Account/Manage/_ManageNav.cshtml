@@ -1,0 +1,47 @@
+@inject SignInManager<IdentityUser> SignInManager
+@{
+    var hasExternalLogins = (await SignInManager.GetExternalAuthenticationSchemesAsync()).Any();
+}
+<ul class="nav nav-pills flex-column gap-2">
+    <li class="nav-item">
+        <a class="nav-link @(ViewContext.ActionDescriptor.DisplayName?.Contains("Index") == true ? "active" : "")" id="profile" asp-page="./Index">Profile</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link @(ViewContext.ActionDescriptor.DisplayName?.Contains("Email") == true ? "active" : "")" id="email" asp-page="./Email">Email</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link @(ViewContext.ActionDescriptor.DisplayName?.Contains("ChangePassword") == true ? "active" : "")" id="change-password" asp-page="./ChangePassword">Password</a>
+    </li>
+    @if (hasExternalLogins)
+    {
+        <li class="nav-item">
+            <a class="nav-link @(ViewContext.ActionDescriptor.DisplayName?.Contains("ExternalLogins") == true ? "active" : "")" id="external-login" asp-page="./ExternalLogins">External logins</a>
+        </li>
+    }
+    <li class="nav-item">
+        <a class="nav-link @(ViewContext.ActionDescriptor.DisplayName?.Contains("TwoFactorAuthentication") == true ? "active" : "")" id="two-factor" asp-page="./TwoFactorAuthentication">2FA</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link @(ViewContext.ActionDescriptor.DisplayName?.Contains("PersonalData") == true ? "active" : "")" id="personal-data" asp-page="./PersonalData">Personal data</a>
+    </li>
+</ul>
+<style>
+    .nav-pills .nav-link {
+        color: rgba(255,255,255,0.7);
+        border: 1px solid transparent;
+        transition: all 0.2s;
+        border-radius: 50px; /* Pillow shape for nav items */
+        padding-left: 20px;
+    }
+    .nav-pills .nav-link.active {
+        background-color: var(--accent-blue) !important;
+        color: black !important;
+        box-shadow: 0 0 15px var(--accent-blue);
+        font-weight: bold;
+    }
+    .nav-pills .nav-link:hover:not(.active) {
+        border-color: rgba(255,255,255,0.3);
+        background: rgba(255,255,255,0.05);
+        color: white;
+    }
+</style>

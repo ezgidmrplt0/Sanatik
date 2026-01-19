@@ -1,0 +1,114 @@
+/* Masonry Layout */
+.masonry-grid {
+    column-count: 4;
+    column-gap: 1.5rem;
+}
+
+@media (max-width: 1200px) {
+    .masonry-grid {
+        column-count: 3;
+    }
+}
+
+@media (max-width: 992px) {
+    .masonry-grid {
+        column-count: 2;
+    }
+}
+
+@media (max-width: 576px) {
+    .masonry-grid {
+        column-count: 1;
+    }
+}
+
+.masonry-item {
+    break-inside: avoid;
+    margin-bottom: 1.5rem;
+}
+
+/* Base Brand Style Card */
+.discovery-card {
+    background: #111;
+    border: 1px solid #333;
+    border-radius: 12px;
+    overflow: hidden;
+    position: relative;
+    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    transform: translateZ(0);
+    /* Hardware accel */
+}
+
+.discovery-card:hover {
+    transform: translateY(-8px) scale(1.02);
+    border-color: var(--accent-blue);
+    box-shadow: 0 20px 40px -10px rgba(0, 243, 255, 0.15);
+    z-index: 10;
+}
+
+.discovery-img {
+    width: 100%;
+    display: block;
+    /* Aspect ratio fallback or allow natural height for masonry */
+    filter: grayscale(80%) contrast(1.1);
+    transition: filter 0.4s ease;
+}
+
+.discovery-card:hover .discovery-img {
+    filter: grayscale(0%) contrast(1);
+}
+
+.discovery-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.9) 0%, rgba(0, 0, 0, 0) 60%);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 1.5rem;
+}
+
+.discovery-card:hover .discovery-overlay {
+    opacity: 1;
+}
+
+/* Base-style Tags */
+.nav-pills .nav-link {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #888;
+    border-radius: 100px;
+    padding: 8px 20px;
+    font-size: 0.85rem;
+    font-family: var(--font-display);
+    letter-spacing: 0.05em;
+    margin-right: 10px;
+    transition: all 0.2s;
+}
+
+.nav-pills .nav-link.active,
+.nav-pills .nav-link:hover {
+    background: #fff;
+    color: #000;
+    border-color: #fff;
+}
+
+/* Custom Scrollbar for that 'app' feel */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #000;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #333;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}

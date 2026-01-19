@@ -1,0 +1,550 @@
+@model Sanatik.Models.MyGalleryViewModel 
+
+@{
+    Layout = null; 
+    var rand = new Random();
+
+    // Collision Detection Helpers
+    var occupied = new List<(int Top, int Left, int Width, int Height)>();
+    
+    bool IsColliding(int t, int l, int w, int h)
+    {
+        foreach(var rect in occupied)
+        {
+            if (l < rect.Left + rect.Width &&
+                l + w > rect.Left &&
+                t < rect.Top + rect.Height &&
+                t + h > rect.Top)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    (int Top, int Left) GetRandomPosition(int w, int h)
+    {
+        int maxAttempts = 50;
+        for(int i = 0; i < maxAttempts; i++)
+        {
+            int t = rand.Next(5, 80); 
+            int l = rand.Next(5, 85); 
+            
+            if (!IsColliding(t, l, w, h))
+            {
+                return (t, l);
+            }
+        }
+        return (rand.Next(5, 80), rand.Next(5, 85));
+    }
+}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>My Gallery - Sanatik</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Space+Grotesk:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" />
+    <link rel="stylesheet" href="~/css/map-style.css" />
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.0/font/bootstrap-icons.css">
+    
+    <style>
+        /* Modal Glass Effect */
+        .modal-glass-container {
+            background: rgba(15, 15, 15, 0.7) !important;
+            backdrop-filter: blur(25px) saturate(180%);
+            -webkit-backdrop-filter: blur(25px) saturate(180%);
+            border: 1px solid rgba(255, 255, 255, 0.08); /* Faint border */
+            box-shadow: 0 30px 60px rgba(0,0,0,0.5);
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Animated gradient bg */
+        .modal-glass-container::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle at 30% 30%, rgba(0, 243, 255, 0.08), transparent 40%),
+                        radial-gradient(circle at 70% 70%, rgba(255, 0, 150, 0.08), transparent 40%);
+            animation: rotateBg 15s linear infinite;
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        @@keyframes rotateBg {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .glass-transparent { background: transparent !important; }
+        .glass-semi { background: rgba(0,0,0,0.2) !important; }
+        .glass-border-bottom { border-bottom: 1px solid rgba(255,255,255,0.1) !important; }
+        .glass-border-top { border-top: 1px solid rgba(255,255,255,0.1) !important; }
+        .glass-border-left { border-left: 1px solid rgba(255,255,255,0.1) !important; }
+        
+        /* Input Field Glass override */
+        .form-control-glass {
+            background: rgba(255, 255, 255, 0.05) !important;
+            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+            color: white !important;
+        }
+        .form-control-glass:focus {
+            background: rgba(255, 255, 255, 0.1) !important;
+            box-shadow: 0 0 10px rgba(255,255,255,0.1);
+        }
+    </style>
+</head>
+<body class="map-mode text-white">
+
+    <!-- 3D Background Canvas -->
+    <canvas id="star-canvas" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -1; background: #050505;"></canvas>
+
+    <!-- Top Navigation Overlay -->
+    <div class="position-fixed top-0 start-0 w-100 p-4 d-flex justify-content-between align-items-center" style="z-index: 200; pointer-events: none;">
+        <div>
+            <h1 class="font-display m-0" style="pointer-events: auto;">MY COLLECTION</h1>
+            <p class="text-secondary font-mono small" style="pointer-events: auto;">DRAG TO EXPLORE • SCROLL TO ZOOM</p>
+        </div>
+        <div style="pointer-events: auto;">
+             <a href="/Home/Feed" class="btn btn-outline-light rounded-pill px-4 me-2">FEED</a>
+             
+             <!-- Account Dropdown -->
+             <div class="btn-group me-2">
+                 <button type="button" class="btn btn-outline-light rounded-pill px-4 dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                     ACCOUNT
+                 </button>
+                 <ul class="dropdown-menu dropdown-menu-dark dropdown-menu-end shadow-lg border-secondary">
+                     <li><a class="dropdown-item" href="/Identity/Account/Manage">Settings</a></li>
+                     <li><a class="dropdown-item" href="/Identity/Account/Manage/ChangePassword">Password</a></li>
+                     <li><hr class="dropdown-divider border-secondary"></li>
+                     <li>
+                         <form class="form-inline" asp-area="Identity" asp-page="/Account/Logout" asp-route-returnUrl="/Home/Index" method="post">
+                             <button type="submit" class="dropdown-item text-danger">Logout</button>
+                         </form>
+                     </li>
+                 </ul>
+             </div>
+
+             <a href="/Profile/Index" class="btn btn-outline-light rounded-pill px-4 me-2">DASHBOARD</a>
+             <button class="btn btn-outline-light rounded-pill px-4 me-2" onclick="toggleListView()">LIST VIEW</button>
+             <a href="/Photos/Create" class="btn btn-primary rounded-pill px-4">UPLOAD</a>
+        </div>
+    </div>
+
+    <!-- List View Overlay (Hidden by default) -->
+    <div id="listViewOverlay" class="position-fixed top-0 end-0 h-100 bg-black border-start border-secondary p-4" 
+         onmouseleave="closeListView()"
+         style="width: 500px; transform: translateX(100%); transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1); z-index: 300; overflow-y: auto;">
+        
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="font-display m-0">INVENTORY</h2>
+            <button onclick="closeListView()" class="btn btn-sm btn-outline-secondary rounded-circle"><i class="bi bi-x-lg"></i></button>
+        </div>
+
+        <h4 class="font-display text-white mb-3 pt-4 border-top border-secondary">SAVED PHOTOS</h4>
+        @if (!Model.SavedPhotos.Any())
+        {
+             <div class="text-muted text-center py-3">No saved items.</div>
+        }
+        else
+        {
+            <div class="list-group list-group-flush">
+                @foreach(var photo in Model.SavedPhotos)
+                {
+                    <div class="list-group-item bg-transparent text-white border-secondary py-3 px-0 d-flex gap-3 align-items-center">
+                        <img src="@photo.ImagePath" style="width: 60px; height: 60px; object-fit: cover; border-radius: 4px;" />
+                        <div class="flex-grow-1">
+                            <h6 class="font-display mb-0 text-truncate" style="max-width: 150px;">@photo.Title</h6>
+                            <small class="text-secondary font-mono">by @(photo.User?.UserName ?? "Unknown")</small>
+                        </div>
+                        <div>
+                            <button onclick="openModal(@photo.Id); closeListView();" class="btn btn-sm btn-outline-light rounded-pill px-3">VIEW</button>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+
+        <h4 class="font-display text-white mb-3 pt-5 border-top border-secondary">MY UPLOADS</h4>
+        @if (!Model.UploadedPhotos.Any())
+        {
+             <div class="text-muted text-center py-3">No uploads yet.</div>
+        }
+        else
+        {
+            <div class="list-group list-group-flush">
+                @foreach(var photo in Model.UploadedPhotos)
+                {
+                    <div class="list-group-item bg-transparent text-white border-secondary py-3 px-0 d-flex gap-3 align-items-center">
+                        <img src="@photo.ImagePath" style="width: 60px; height: 60px; object-fit: cover; border-radius: 4px;" />
+                        <div class="flex-grow-1">
+                            <h6 class="font-display mb-0 text-truncate" style="max-width: 150px;">@photo.Title</h6>
+                            <small class="text-secondary font-mono">@photo.UploadDate.ToString("yyyy.MM.dd")</small>
+                        </div>
+                        <div>
+                            <button onclick="openModal(@photo.Id); closeListView();" class="btn btn-sm btn-outline-light rounded-pill px-3">VIEW</button>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+    <script>
+        function toggleListView() {
+            const el = document.getElementById('listViewOverlay');
+            if(el.style.transform === 'translateX(0%)') {
+                closeListView();
+            } else {
+                el.style.transform = 'translateX(0%)';
+            }
+        }
+
+        function closeListView() {
+            document.getElementById('listViewOverlay').style.transform = 'translateX(100%)';
+        }
+    </script>
+
+    <!-- Viewport for the Map -->
+    <div id="viewport">
+        <div id="world">
+            @if (!Model.UploadedPhotos.Any())
+            {
+                <div class="d-flex justify-content-center align-items-center" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;">
+                    <div class="text-center p-5 mx-3" style="background: rgba(15, 15, 15, 0.7); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 20px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); max-width: 500px;">
+                        <i class="bi bi-images mb-3 d-block text-secondary" style="font-size: 3rem;"></i>
+                        <h2 class="font-display text-white mb-2">GALLERY EMPTY</h2>
+                        <p class="text-secondary font-mono small mb-4">You haven't uploaded any photos yet. Start your collection today.</p>
+                        <a href="/Photos/Create" class="btn btn-primary rounded-pill px-5 shadow-lg">UPLOAD FIRST PHOTO</a>
+                    </div>
+                </div>
+            }
+            else
+            {
+            @foreach(var photo in Model.UploadedPhotos)
+                {
+                    // Use Discovery card style for My Gallery photos
+                    int width = 10; 
+                    int height = 22;
+                    var pos = GetRandomPosition(width, height);
+                    occupied.Add((pos.Top, pos.Left, width, height));
+
+                    <div class="map-card p-2" onclick="openModal(@photo.Id)" 
+                         style="position: absolute; top: @(pos.Top)%; left: @(pos.Left)%; width: 260px;">
+                        <img src="@photo.ImagePath" alt="@photo.Title" draggable="false">
+                        <div class="p-2">
+                             <h6 class="font-display mb-0 text-truncate">@photo.Title</h6>
+                             <small class="text-secondary font-mono d-block mt-1">
+                                 @photo.UploadDate.ToString("yyyy.MM.dd")
+                             </small>
+                             <div class="mt-2 text-end">
+                                 <button class="btn btn-sm btn-outline-secondary rounded-0 py-0" style="font-size: 0.7rem;">VIEW</button>
+                             </div>
+                        </div>
+                    </div>
+                }
+            }
+        </div>
+    </div>
+
+    <!-- Map Controls -->
+    <div class="map-ui">
+        <button onclick="zoomOut()"><i class="bi bi-dash"></i></button>
+        <button onclick="resetView()" class="font-mono" style="width: auto; padding: 0 15px; border-radius: 20px;">RESET</button>
+        <button onclick="zoomIn()"><i class="bi bi-plus"></i></button>
+    </div>
+
+    <!-- Photo Detail Modal (Overlay) -->
+    <div id="detailModal" class="position-fixed top-0 start-0 w-100 h-100 justify-content-center align-items-center" 
+         style="background: rgba(0,0,0,0.85); z-index: 2000; display: none; backdrop-filter: blur(5px);">
+         
+         <div class="modal-glass-container d-flex" style="width: 900px; height: 600px; max-width: 95vw; max-height: 90vh; border-radius: 12px;">
+             
+             <!-- Image Half -->
+             <div class="w-60 glass-transparent d-flex align-items-center justify-content-center p-0" style="width: 60%;">
+                 <img id="dm_img" src="" style="width: 100%; height: 100%; object-fit: contain;">
+             </div>
+
+             <!-- Details Half -->
+             <div class="w-40 d-flex flex-column text-white glass-border-left" style="width: 40%;">
+                 
+                 <!-- Header -->
+                     <div class="d-flex justify-content-between align-items-start">
+                         <div>
+                             <h4 id="dm_title" class="font-display mb-1">Title</h4>
+                             <small class="text-secondary font-mono">
+                                 by <span id="dm_user" class="text-white">User</span>
+                                 <button id="btnFollow" onclick="actionFollow()" class="btn btn-sm btn-outline-primary rounded-pill py-0 px-2 ms-2" style="font-size: 0.7rem; display: none;">FOLLOW</button>
+                             </small>
+                         </div>
+                         <button onclick="closeModal()" class="btn btn-link text-white p-0"><i class="bi bi-x-lg"></i></button>
+                     </div>
+                     <p id="dm_desc" class="text-muted mt-3 small mb-0">Description goes here...</p>
+                 </div>
+
+                 <!-- Stats & Actions -->
+                 <div class="p-3 glass-transparent glass-border-bottom d-flex justify-content-around align-items-center">
+                     
+                     <div class="text-center cursor-pointer" onclick="actionLike()">
+                         <i id="btnLikeIcon" class="bi bi-heart fs-4"></i>
+                         <div class="small text-secondary mt-1"><span id="dm_likeCount">0</span> Likes</div>
+                     </div>
+
+                     <div class="text-center cursor-pointer" onclick="actionFavorite()">
+                         <i id="btnFavIcon" class="bi bi-bookmark fs-4"></i>
+                         <div class="small text-secondary mt-1"><span id="dm_favCount">0</span> Saves</div>
+                     </div>
+
+                 </div>
+
+                 <!-- Comments -->
+                 <div class="flex-grow-1 overflow-auto p-3 glass-semi" id="commentsList">
+                     <!-- Comments injected here -->
+                 </div>
+
+                 <!-- Comment Input -->
+                 <div class="p-3 glass-border-top glass-transparent">
+                     <div class="input-group">
+                         <input type="text" id="commentInput" class="form-control form-control-glass" placeholder="Add a comment...">
+                         <button class="btn btn-outline-light" onclick="postComment()">POST</button>
+                     </div>
+                 </div>
+
+             </div>
+         </div>
+    </div>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/map-interaction.js"></script>
+    <script src="~/js/bg-stars.js"></script>
+    
+    <script>
+        // RAZOR SAFE VARIABLES
+        var AT_SYMBOL = '@("@")'; 
+        let currentPhotoId = 0;
+        let currentPhotoUserId = "";
+
+        document.addEventListener("DOMContentLoaded", function() {
+            console.log("MyGallery script loaded.");
+        });
+
+        function openModal(id) {
+            console.log("openModal called with id:", id);
+            currentPhotoId = id;
+
+            var modal = document.getElementById('detailModal');
+            if(!modal) {
+                alert("Error: Modal element not found!");
+                return;
+            }
+            
+            modal.style.display = 'flex';
+            
+            // UI References
+            var imgEl = document.getElementById('dm_img');
+            var titleEl = document.getElementById('dm_title');
+            var userEl = document.getElementById('dm_user');
+            var followBtn = document.getElementById('btnFollow');
+            var descEl = document.getElementById('dm_desc');
+            var likeCountEl = document.getElementById('dm_likeCount');
+            var favCountEl = document.getElementById('dm_favCount');
+            
+            // Set loading state
+            if(imgEl) { imgEl.style.opacity = '0.5'; imgEl.src = ''; }
+            if(titleEl) titleEl.innerText = 'Loading...';
+            if(followBtn) followBtn.style.display = 'none';
+            
+            // Fetch Data
+            fetch('/Photos/GetPhotoDetails?id=' + id)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error("HTTP error " + response.status);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log("Data received:", data);
+                    
+                    // Standardize data (handle casing)
+                    var title = data.title || data.Title || "Untitled";
+                    var imagePath = data.imagePath || data.ImagePath || "";
+                    var userName = data.userName || data.UserName || "Unknown";
+                    var description = data.description || data.Description || "No description.";
+                    var likeCount = data.likeCount ?? data.LikeCount ?? 0;
+                    var favCount = data.favoriteCount ?? data.FavoriteCount ?? 0;
+                    var isLiked = data.isLiked ?? data.IsLiked ?? false;
+                    var isFavorited = data.isFavorited ?? data.IsFavorited ?? false;
+                    var comments = data.comments || data.Comments || [];
+                    var isFollowing = data.isFollowing ?? data.IsFollowing ?? false;
+                    currentPhotoUserId = data.photoUserId || data.PhotoUserId || "";
+
+                    // Populate UI
+                    if(imgEl) { 
+                        imgEl.src = imagePath; 
+                        imgEl.onload = function() { this.style.opacity = '1'; };
+                    }
+                    if(titleEl) titleEl.innerText = title;
+                    
+                    // Format username
+                    if(userEl) {
+                        try {
+                            let safeName = userName;
+                            if(safeName.includes(AT_SYMBOL)) {
+                                safeName = safeName.split(AT_SYMBOL)[0];
+                            }
+                            userEl.innerText = AT_SYMBOL + safeName.toUpperCase();
+                        } catch(e) {
+                            console.error("Format error", e);
+                            userEl.innerText = userName;
+                        }
+                    }
+                    
+                    // Follow Button Logic
+                    if(followBtn && currentPhotoUserId) {
+                        followBtn.style.display = 'inline-block';
+                        updateFollowButton(isFollowing);
+                    } else {
+                        followBtn.style.display = 'none';
+                    }
+                    
+                    if(descEl) descEl.innerText = description;
+                    if(likeCountEl) likeCountEl.innerText = likeCount;
+                    if(favCountEl) favCountEl.innerText = favCount;
+                    
+                    // Icons
+                    updateIcon('btnLikeIcon', isLiked, 'bi-heart-fill text-danger', 'bi-heart text-white');
+                    updateIcon('btnFavIcon', isFavorited, 'bi-bookmark-fill text-primary', 'bi-bookmark text-white');
+
+                    // Comments
+                    const list = document.getElementById('commentsList');
+                    if(list) {
+                        list.innerHTML = '';
+                        if(comments.length > 0) {
+                            comments.forEach(c => {
+                                var cUser = c.userName || c.UserName || "user";
+                                var cContent = c.content || c.Content || "";
+                                var cTime = c.timeAgo || c.TimeAgo || "";
+                                
+                                let cSafeName = cUser;
+                                if(cSafeName.includes(AT_SYMBOL)) cSafeName = cSafeName.split(AT_SYMBOL)[0];
+
+                                const div = document.createElement('div');
+                                div.className = 'mb-3 d-flex flex-column align-items-start';
+                                div.innerHTML = `
+                                    <div class="glass-message p-2 px-3 rounded-3" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1);">
+                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                            <span class="fw-bold fs-6 text-info me-2">${AT_SYMBOL}${cSafeName.toUpperCase()}</span>
+                                            <span class="text-white-50 small font-mono" style="font-size: 0.65rem;">${cTime}</span>
+                                        </div>
+                                        <p class="mb-0 small" style="line-height: 1.4; color: #ffffff !important; font-weight: 500;">${cContent}</p>
+                                    </div>
+                                `;
+                                list.appendChild(div);
+                            });
+                        } else {
+                            list.innerHTML = '<div class="text-center text-muted small mt-5">No comments yet.</div>';
+                        }
+                    }
+
+                })
+                .catch(err => {
+                    console.error("Fetch error:", err);
+                    alert("Error loading photo details: " + err.message);
+                    if(titleEl) titleEl.innerText = "Error";
+                });
+        }
+
+        function closeModal() {
+            document.getElementById('detailModal').style.display = 'none';
+        }
+
+        function updateIcon(elId, isActive, activeClass, inactiveClass) {
+            const el = document.getElementById(elId);
+            if(el) el.className = 'fs-4 ' + (isActive ? activeClass : inactiveClass);
+        }
+
+        function updateFollowButton(isFollowing) {
+            const btn = document.getElementById('btnFollow');
+            if(isFollowing) {
+                btn.innerText = "UNFOLLOW";
+                btn.className = "btn btn-sm btn-light rounded-pill py-0 px-2 ms-2";
+            } else {
+                btn.innerText = "FOLLOW";
+                btn.className = "btn btn-sm btn-outline-primary rounded-pill py-0 px-2 ms-2";
+            }
+        }
+
+        function actionFollow() {
+             if(typeof $ !== 'undefined' && currentPhotoUserId) {
+                 $.post('/Photos/ToggleFollow', { followeeId: currentPhotoUserId }, function(res) {
+                     if(res.success) {
+                         updateFollowButton(res.isFollowing);
+                     } else {
+                         alert("Could not update follow status.");
+                     }
+                 }).fail(function(xhr) {
+                     alert("Error: " + xhr.responseText);
+                 });
+             }
+        }
+
+        function actionLike() {
+             if(typeof $ !== 'undefined') {
+                 $.post('/Photos/AjaxLike', { photoId: currentPhotoId }, function(res) {
+                     if(res.success) {
+                         updateIcon('btnLikeIcon', res.isLiked, 'bi-heart-fill text-danger', 'bi-heart text-white');
+                         document.getElementById('dm_likeCount').innerText = res.count;
+                     }
+                 });
+             }
+        }
+
+        function actionFavorite() {
+             if(typeof $ !== 'undefined') {
+                 $.post('/Photos/ToggleFavorite', { photoId: currentPhotoId }, function(res) {
+                     if(res.success) {
+                          updateIcon('btnFavIcon', res.isFavorited, 'bi-bookmark-fill text-primary', 'bi-bookmark text-white');
+                          document.getElementById('dm_favCount').innerText = res.count;
+                     }
+                 });
+             }
+        }
+
+        function postComment() {
+            const input = document.getElementById('commentInput');
+            const val = input.value;
+            if(!val) return;
+
+            if(typeof $ !== 'undefined') {
+                $.post('/Photos/AjaxComment', { photoId: currentPhotoId, content: val }, function(res) {
+                    if(res.success) {
+                         input.value = '';
+                         const list = document.getElementById('commentsList');
+                         if(list.innerText.includes('No comments yet')) list.innerHTML = '';
+
+                         const div = document.createElement('div');
+                         div.className = 'mb-3 pb-2 border-bottom border-secondary border-opacity-25';
+                         div.innerHTML = `
+                                <div class="d-flex justify-content-between">
+                                    <span class="fw-bold fs-6 small text-white">${AT_SYMBOL}${res.userName}</span>
+                                    <span class="text-secondary small" style="font-size: 0.6rem;">${res.timeAgo}</span>
+                                </div>
+                                <p class="mb-0 text-muted small mt-1">${res.content}</p>
+                            `;
+                         list.insertBefore(div, list.firstChild);
+                    }
+                });
+            }
+        }
+    </script>
+</body>
+</html>

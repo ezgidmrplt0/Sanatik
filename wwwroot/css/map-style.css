@@ -1,0 +1,115 @@
+/* Map / Canvas Navigation Styles */
+:root {
+    --bg-color: #050505;
+}
+
+body.map-mode {
+    overflow: hidden;
+    /* Disable default scroll */
+    height: 100vh;
+    width: 100vw;
+    cursor: grab;
+    background-color: transparent;
+    /* Changed to transparent to show 3D Canvas */
+}
+
+/* Animation removed */
+
+body.map-mode:active {
+    cursor: grabbing;
+}
+
+#viewport {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: transparent;
+    z-index: 1;
+}
+
+#world {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform-origin: center center;
+    /* Will be updated by JS: transform: translate(x, y) scale(s) */
+    width: 3000px;
+    height: 2000px;
+    /* Removed flex to allow absolute positioning of children */
+    margin-top: -1000px;
+    margin-left: -1500px;
+}
+
+.map-card {
+    width: 300px;
+    background: #111;
+    border: 1px solid #333;
+    transition: transform 0.3s ease, border-color 0.3s, z-index 0s;
+    position: relative;
+    user-select: none;
+    /* Prevent text selection while dragging */
+}
+
+/* Scatter the cards slightly for "messy map" look */
+.map-card:nth-child(2n) {
+    margin-top: 50px;
+}
+
+.map-card:nth-child(3n) {
+    margin-top: -30px;
+    margin-left: 20px;
+}
+
+.map-card:nth-child(5n) {
+    margin-top: 80px;
+}
+
+.map-card:hover {
+    transform: scale(1.1);
+    border-color: var(--accent-blue);
+    z-index: 100;
+    box-shadow: 0 0 20px rgba(0, 243, 255, 0.2);
+}
+
+.map-card img {
+    width: 100%;
+    height: auto;
+    display: block;
+    pointer-events: none;
+    /* Let clicks pass through to card for dragging */
+}
+
+/* Navigation UI Overlay */
+.map-ui {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 200;
+    display: flex;
+    gap: 10px;
+    background: rgba(0, 0, 0, 0.8);
+    padding: 10px 20px;
+    border-radius: 50px;
+    border: 1px solid #333;
+    backdrop-filter: blur(5px);
+}
+
+.map-ui button {
+    background: transparent;
+    border: 1px solid #555;
+    color: white;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.map-ui button:hover {
+    background: white;
+    color: black;
+}
