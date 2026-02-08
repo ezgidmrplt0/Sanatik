@@ -35,8 +35,7 @@ Bu proje, ASP.NET Core MVC mimarisi kullanılarak geliştirilmiş, yaşayan ve d
 - **Frontend:** HTML5, CSS3 (Premium Dark Theme), Javascript, Bootstrap
 - **Kimlik Doğrulama:** ASP.NET Core Identity
 
-- https://youtu.be/7mnL0aoMAMw
-
+-
 
 
 
